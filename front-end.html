@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang=""en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="design.css"/>
+    <title>StudentApp</title>
+</head>
+<body>
+    <p id="storage-status" class="storage-status" role="status" hidden></p>
+    <div id="start" class="intro">
+        <div class="welcome-card">
+            <h1 class="welcome-title">StudentApp</h1>
+            <p class="welcome-copy">Keep your classes, assignments, grades, and events together.</p>
+            <button id="getStarted">Get Started!</button>
+        </div>
+    </div>
+    <h1 class="app-title">StudentApp</h1>
+    <div id="main" class="main-page">
+        <button class="main-btn" id="add-class">Add Class</button>
+        <button class="main-btn" id="add-event">Add Event</button>
+        <button class="main-btn" id="main-calendarBtn">Calendar</button>
+    </div>
+    <div id="add-class-form" class="add-class-form">
+        <button id="form-backBtn">Back</button>
+        <input type="text" id="class-name" placeholder="Class Name">
+        <input type="text" id="class-code" placeholder="Class Code">
+        <button id="submit-class">Submit</button>
+     </div>
+    <div id="add-event-form" class="add-event-form">
+        <button id="event-backBtn">Back</button>
+        <input type="text" id="event-name" placeholder="Event Name" required>
+        <input type="date" id="event-date" required>
+        <input type="text" id="event-time" placeholder="Event Time">
+        <select id="event-class" required aria-label="Class for event">
+            <option value="">Choose a class</option>
+        </select>
+        <button id="submit-event" type="button">Submit</button>
+    </div>
+    <div id="main-calendar" class="main-calendar">
+         <button id="calendar-backBtn">Back</button>
+         <div class="month">
+            <button class="prev" id="previous-month" aria-label="Previous month">&#10094;</button>
+            <h2 id="calendar-month" aria-live="polite"></h2>
+            <button class="next" id="next-month" aria-label="Next month">&#10095;</button>
+         </div>
+         <ul class="weekdays">
+            <li>Mon</li>
+            <li>Tue</li>
+            <li>Wed</li>
+            <li>Thu</li>
+            <li>Fri</li>
+            <li>Sat</li>
+            <li>Sun</li>
+         </ul>
+         <ul class="days" id="calendar-days"></ul>
+    </div>
+    <div id="class-list" class="class-list">
+        <h2>Your Classes</h2>
+        <table>
+            <tbody id="class-table"></tbody>
+        </table>
+    </div>
+    <div id="class-page" class="class-page">
+        <div class="class-page-header">
+            <h1 id="class-header"></h1>
+            <div class="class-page-actions">
+                <button id="class-backBtn">Back</button>
+                <button id="edit-class">Edit Mode</button>
+            </div>
+        </div>
+        <div class="class-tabs" role="tablist" aria-label="Class information">
+            <button id="class-assignment" class="class-tab active" type="button" role="tab" aria-selected="true" aria-controls="assignment-tab">Assignment</button>
+            <button id="class-calendar" class="class-tab" type="button" role="tab" aria-selected="false" aria-controls="calendar-tab">Calendar</button>
+        </div>
+        <section id="assignment-tab" class="class-panel" role="tabpanel" aria-labelledby="class-assignment">
+            <h2>Assignments &amp; Grades</h2>
+            <div class="overall-grade" aria-live="polite">
+                <div>
+                    <h3>Overall Grade</h3>
+                    <p id="overall-grade-detail">Add graded assignments to calculate your weighted average.</p>
+                </div>
+                <output id="overall-grade" for="assignment-grade assignment-weight">—</output>
+            </div>
+            <form id="assignment-form" class="assignment-form">
+                <input type="text" id="assignment-name" placeholder="Assignment name" required>
+                <input type="number" id="assignment-grade" placeholder="Grade (%)" aria-label="Grade percentage" min="0" max="100" step="0.01" required>
+                <input type="number" id="assignment-weight" placeholder="Weight (%)" aria-label="Assignment weight percentage" min="0.01" max="100" step="0.01" required>
+                <select id="assignment-type" aria-label="Assignment type" required>
+                    <option value="">Choose a type</option>
+                    <option value="assignment">Assignment</option>
+                    <option value="quiz">Quiz</option>
+                    <option value="exam">Exam</option>
+                </select>
+                <button type="submit">Add Assignment</button>
+            </form>
+            <ul id="class-assignment-list" class="class-record-list"></ul>
+        </section>
+        <section id="calendar-tab" class="class-panel" role="tabpanel" aria-labelledby="class-calendar" hidden>
+            <h2>Upcoming Events</h2>
+            <ul id="class-event-list" class="class-record-list"></ul>
+        </section>
+    </div>
+    <dialog id="appearance-dialog" class="appearance-dialog" aria-labelledby="appearance-title">
+        <form id="appearance-form">
+            <div class="appearance-dialog-header">
+                <div>
+                    <h2 id="appearance-title">Customize class</h2>
+                    <p>Changes preview here and apply only to this class.</p>
+                </div>
+                <button id="appearance-close" class="dialog-close" type="button" aria-label="Close customization">×</button>
+            </div>
+            <div class="appearance-options">
+                <label>
+                    Text color
+                    <input id="theme-text-color" type="color" value="#193b3b">
+                </label>
+                <label>
+                    Background color
+                    <input id="theme-background-color" type="color" value="#edf8f6">
+                </label>
+                <label>
+                    Font
+                    <select id="theme-font">
+                        <option value="Arial, sans-serif">Arial</option>
+                        <option value="Georgia, serif">Georgia</option>
+                        <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                        <option value="'Courier New', monospace">Courier New</option>
+                    </select>
+                </label>
+                <label>
+                    Wallpaper
+                    <select id="theme-wallpaper">
+                        <option value="glow">Soft glow</option>
+                        <option value="dots">Floating dots</option>
+                        <option value="diagonal">Diagonal lines</option>
+                        <option value="grid">Soft grid</option>
+                    </select>
+                </label>
+                <fieldset class="category-colors">
+                    <legend>Assignment colors</legend>
+                    <label>
+                        Assignments
+                        <input id="theme-assignment-color" type="color" value="#d9eee9">
+                    </label>
+                    <label>
+                        Quizzes
+                        <input id="theme-quiz-color" type="color" value="#e6def5">
+                    </label>
+                    <label>
+                        Exams
+                        <input id="theme-exam-color" type="color" value="#f5e2d9">
+                    </label>
+                </fieldset>
+            </div>
+            <div class="appearance-dialog-actions">
+                <button id="appearance-cancel" type="button">Cancel</button>
+                <button type="submit">Apply changes</button>
+            </div>
+        </form>
+    </dialog>
+    <script src="javascript.js"></script>
+</body>
+</html>
