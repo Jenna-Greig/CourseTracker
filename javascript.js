@@ -73,6 +73,8 @@ const mainCalendarDiv = document.getElementById("main-calendar");
 //class-screen
 
 //reoccuring values
+document.body.classList.add("app-loading");
+
 let numClasses = 0;
 const events = [];
 const assignments = [];
@@ -87,7 +89,8 @@ const defaultClassTheme = {
         exam: "#f5e2d9"
     }
 };
-const storageKey = "courseTrackerData";
+const legacyStorageKey = "courseTrackerData";
+const apiUrl = "/api/data";
 const availableFonts = [
     "Arial, sans-serif",
     "Georgia, serif",
@@ -98,6 +101,7 @@ const availableWallpapers = ["glow", "dots", "diagonal", "grid"];
 const classThemes = new Map();
 let activeClassCode = "";
 let themeBeforeEdit;
+let saveQueue = Promise.resolve();
 let displayedMonth = new Date();
 displayedMonth = new Date(displayedMonth.getFullYear(), displayedMonth.getMonth(), 1);
 
@@ -123,8 +127,8 @@ function createClassRow(code, name) {
     return row;
 }
 
-function saveAppData() {
-    const data = {
+function buildAppData() {
+    return {
         version: 1,
         classes: Array.from(classTable.rows, (row) => ({
             code: row.id,
@@ -134,28 +138,82 @@ function saveAppData() {
         assignments,
         classThemes: Object.fromEntries(classThemes)
     };
+}
 
-    try {
-        localStorage.setItem(storageKey, JSON.stringify(data));
+function saveAppData() {
+    const data = buildAppData();
+    saveQueue = saveQueue.catch(() => {}).then(async () => {
+        const response = await fetch(apiUrl, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || `The server returned ${response.status}.`);
+        }
         showStorageStatus("");
+    }).catch((error) => {
+        console.error("Unable to save CourseTracker data to SQLite.", error);
+        showStorageStatus(`Could not save changes to the SQL backend: ${error.message}`);
+    });
+    return saveQueue;
+}
+
+async function requestAppData(method, data) {
+    const response = await fetch(apiUrl, {
+        method,
+        headers: data ? { "Content-Type": "application/json" } : undefined,
+        body: data ? JSON.stringify(data) : undefined
+    });
+    const result = await response.json();
+    if (!response.ok) {
+        throw new Error(result.error || `The server returned ${response.status}.`);
+    }
+    return result;
+}
+
+async function migrateBrowserData(databaseData) {
+    if (databaseData.classes.length > 0) return databaseData;
+
+    let serializedData;
+    try {
+        serializedData = localStorage.getItem(legacyStorageKey);
     } catch (error) {
-        console.error("Unable to save CourseTracker data.", error);
-        showStorageStatus("Your latest changes could not be saved in this browser.");
+        console.error("Unable to access existing browser-saved data.", error);
+        showStorageStatus("Could not check for browser-saved data to migrate.");
+        return databaseData;
+    }
+    if (!serializedData) return databaseData;
+
+    let browserData;
+    try {
+        browserData = JSON.parse(serializedData);
+    } catch (error) {
+        console.error("Existing browser-saved data is not valid JSON.", error);
+        showStorageStatus("Existing browser-saved data could not be migrated and was left unchanged.");
+        return databaseData;
+    }
+    try {
+        await requestAppData("PUT", browserData);
+        let migrated = true;
+        try {
+            localStorage.removeItem(legacyStorageKey);
+        } catch (error) {
+            console.error("Migrated browser data could not be removed.", error);
+            showStorageStatus("Data was migrated to SQLite, but the old browser copy could not be removed.");
+            migrated = false;
+        }
+        if (migrated) showStorageStatus("Your existing browser-saved data was moved to the SQL database.");
+        return browserData;
+    } catch (error) {
+        console.error("Unable to migrate browser-saved data to SQLite.", error);
+        showStorageStatus(`Could not migrate existing browser-saved data: ${error.message}`);
+        throw error;
     }
 }
 
-function restoreAppData() {
-    let storedData;
-    try {
-        const serializedData = localStorage.getItem(storageKey);
-        if (!serializedData) return;
-        storedData = JSON.parse(serializedData);
-    } catch (error) {
-        console.error("Unable to read CourseTracker data.", error);
-        showStorageStatus("Saved data could not be read. It has been left unchanged.");
-        return;
-    }
-
+function restoreAppData(storedData) {
     if (!storedData || storedData.version !== 1 ||
         !Array.isArray(storedData.classes) ||
         !Array.isArray(storedData.events) ||
@@ -163,8 +221,7 @@ function restoreAppData() {
         typeof storedData.classThemes !== "object" ||
         storedData.classThemes === null ||
         Array.isArray(storedData.classThemes)) {
-        showStorageStatus("Saved data has an unsupported format and was not loaded.");
-        return;
+        throw new Error("The SQL backend returned data in an unsupported format.");
     }
 
     const validClasses = storedData.classes.filter((course) =>
@@ -172,8 +229,12 @@ function restoreAppData() {
         typeof course.name === "string" && course.name.trim()
     ).slice(0, 8);
     const validCodes = new Set(validClasses.map((course) => course.code));
+    classTable.replaceChildren();
     validClasses.forEach((course) => classTable.appendChild(createClassRow(course.code, course.name)));
     numClasses = validClasses.length;
+    events.length = 0;
+    assignments.length = 0;
+    classThemes.clear();
 
     storedData.events.forEach((event) => {
         if (event && typeof event.name === "string" && typeof event.date === "string" &&
@@ -197,6 +258,7 @@ function restoreAppData() {
                 classCode: assignment.classCode
             });
         }
+
     });
 
     Object.entries(storedData.classThemes).forEach(([classCode, theme]) => {
@@ -221,6 +283,34 @@ function restoreAppData() {
             }
         });
     });
+}
+
+async function initializeApp() {
+    try {
+        showStorageStatus("Connecting to the local SQL database…");
+        const databaseData = await requestAppData("GET");
+        const appData = await migrateBrowserData(databaseData);
+        restoreAppData(appData);
+        refreshEventClassOptions();
+        document.body.classList.remove("app-loading");
+        if (numClasses > 0) {
+            introDiv.style.display = "none";
+            appTitle.style.display = "";
+            mainDiv.style.display = "block";
+            classes.style.display = "block";
+        } else {
+            document.body.classList.add("welcome-screen");
+        }
+        showStorageStatus("");
+    } catch (error) {
+        console.error("Unable to initialize CourseTracker.", error);
+        document.body.classList.remove("app-loading");
+        document.body.classList.add("welcome-screen");
+        introDiv.style.display = "grid";
+        startBtn.disabled = true;
+        startBtn.textContent = "Database unavailable";
+        showStorageStatus(`Cannot connect to the local SQL backend: ${error.message} Start it with /usr/bin/python3 server.py, then reload this page.`);
+    }
 }
 
 function getLocalDateString(date = new Date()) {
@@ -423,16 +513,7 @@ function refreshEventClassOptions() {
     eventClassInput.value = selectedClassCode;
 }
 
-restoreAppData();
-refreshEventClassOptions();
-if (numClasses > 0) {
-    introDiv.style.display = 'none';
-    appTitle.style.display = '';
-    mainDiv.style.display = 'block';
-    classes.style.display = 'block';
-} else {
-    document.body.classList.add("welcome-screen");
-}
+initializeApp();
 
 //from intro screen to main screen
 startBtn.addEventListener("click", ()=>{
